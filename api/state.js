@@ -7,15 +7,22 @@ let pool;
 let tableReady;
 
 function getPool() {
-  if (!process.env.DATABASE_URL) {
-    const error = new Error("DATABASE_URL is not configured.");
+  const connectionString =
+    process.env.DATABASE_URL ||
+    process.env.POSTGRES_URL ||
+    process.env.PRISMA_DATABASE_URL;
+
+  if (!connectionString) {
+    const error = new Error(
+      "DATABASE_URL, POSTGRES_URL, or PRISMA_DATABASE_URL is not configured."
+    );
     error.statusCode = 500;
     throw error;
   }
 
   if (!pool) {
     pool = new Pool({
-      connectionString: process.env.DATABASE_URL,
+      connectionString,
       ssl: process.env.NODE_ENV === "production"
         ? { rejectUnauthorized: false }
         : undefined,

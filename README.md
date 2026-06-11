@@ -19,6 +19,8 @@ Vercel 프로젝트 환경변수에 아래 값을 추가해야 DB 저장이 동�
 DATABASE_URL="postgres://USER:PASSWORD@HOST:PORT/DATABASE?sslmode=require"
 ```
 
+Prisma Postgres 또는 Vercel Storage가 `POSTGRES_URL`이나 `PRISMA_DATABASE_URL` 이름으로 연결 문자열을 제공하는 경우도 그대로 사용할 수 있습니다. 앱은 `DATABASE_URL`, `POSTGRES_URL`, `PRISMA_DATABASE_URL` 순서로 연결 문자열을 찾습니다.
+
 Vercel Postgres, Neon, Supabase 등 Postgres 호환 DB의 connection string을 사용할 수 있습니다. 배포 후 `/api/state`가 처음 호출될 때 `family_app_state` 테이블이 자동으로 생성됩니다.
 
 ## 확인
