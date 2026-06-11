@@ -45,6 +45,21 @@
     return loadLocalState(fallback);
   }
 
+  function loadCachedState(fallback = EMPTY_STATE) {
+    return loadLocalState(fallback);
+  }
+
+  async function refreshState(fallback = EMPTY_STATE) {
+    const response = await fetch("/api/state", { cache: "no-store" });
+    if (!response.ok) {
+      throw new Error(`Load failed: ${response.status}`);
+    }
+
+    const state = normalizeState(await response.json(), fallback);
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+    return state;
+  }
+
   async function saveState(state) {
     const normalizedState = normalizeState(state);
     localStorage.setItem(STORAGE_KEY, JSON.stringify(normalizedState));
@@ -66,6 +81,8 @@
 
   window.familyStorage = {
     loadState,
+    loadCachedState,
+    refreshState,
     saveState,
     normalizeState,
   };

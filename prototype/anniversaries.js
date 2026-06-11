@@ -103,9 +103,16 @@ form.addEventListener("submit", async (event) => {
 });
 
 async function init() {
-  state = await window.familyStorage.loadState();
+  state = window.familyStorage.loadCachedState();
   addRow();
   renderList();
+
+  try {
+    state = await window.familyStorage.refreshState();
+    renderList();
+  } catch (error) {
+    console.info("Using cached schedule state.", error);
+  }
 }
 
 init();

@@ -288,8 +288,15 @@ function render() {
 }
 
 async function init() {
-  state = await window.familyStorage.loadState();
+  state = window.familyStorage.loadCachedState();
   render();
+
+  try {
+    state = await window.familyStorage.refreshState();
+    render();
+  } catch (error) {
+    console.info("Using cached schedule state.", error);
+  }
 }
 
 init();

@@ -254,8 +254,15 @@ logoutButton?.addEventListener("click", () => {
 });
 
 async function init() {
-  state = normalizeState(await window.familyStorage.loadState(defaultState));
+  state = normalizeState(window.familyStorage.loadCachedState(defaultState));
   render();
+
+  try {
+    state = normalizeState(await window.familyStorage.refreshState(defaultState));
+    render();
+  } catch (error) {
+    console.info("Using cached schedule state.", error);
+  }
 }
 
 init();
