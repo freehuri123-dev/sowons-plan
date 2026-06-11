@@ -1,22 +1,3 @@
 {
-  "$schema": "https://openapi.vercel.sh/vercel.json",
-  "rewrites": [
-    {
-      "source": "/",
-      "destination": "/prototype/start.html"
-    },
-    {
-      "source": "/assets/:path*",
-      "destination": "/prototype/assets/:path*"
-    },
-    {
-      "source": "/:file((?:.*\\.html|.*\\.js|.*\\.css))",
-      "destination": "/prototype/:file"
-    }
-  ],
-  "functions": {
-    "api/**/*.js": {
-      "maxDuration": 10
-    }
-  }
+  "$schema": "https://openapi.vercel.sh/vercel.json"
 }

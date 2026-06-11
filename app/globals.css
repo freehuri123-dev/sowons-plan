@@ -1,0 +1,11 @@
+@import "../prototype/styles.css";
+
+.next-view {
+  animation: page-enter 160ms ease-out both;
+}
+
+.loading-inline {
+  color: #536179;
+  font-size: 12px;
+  font-weight: 900;
+}
