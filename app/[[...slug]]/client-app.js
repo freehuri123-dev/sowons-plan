@@ -418,7 +418,14 @@ function StartView({ setSession, navigate }) {
         <p className="eyebrow">SOWON&apos;S HAPPY PLAN</p>
       </header>
       <section className="entrance-hero" aria-label="소원이네 가족 그림">
-        <img src="/assets/family-entrance.jpg" alt="소원이네 가족 그림" />
+        <img
+          src="/assets/family-entrance-mobile.webp"
+          alt="소원이네 가족 그림"
+          width="1000"
+          height="1522"
+          fetchPriority="high"
+          decoding="async"
+        />
       </section>
       <section className="entrance-actions">
         <div className="person-grid">
