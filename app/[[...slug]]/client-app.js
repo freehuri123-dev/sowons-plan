@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 
 const MEMBERS = [
@@ -396,6 +396,17 @@ function StartView({ setSession, navigate }) {
   const [selectedName, setSelectedName] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState(false);
+  const passwordPanelRef = useRef(null);
+
+  useEffect(() => {
+    if (!selectedName) return;
+    window.setTimeout(() => {
+      passwordPanelRef.current?.scrollIntoView({
+        behavior: "smooth",
+        block: "center",
+      });
+    }, 40);
+  }, [selectedName]);
 
   function enterChild() {
     setSession("sowon", false);
@@ -454,7 +465,7 @@ function StartView({ setSession, navigate }) {
         </div>
       </section>
       {selectedName ? (
-        <section className="entrance-password">
+        <section className="entrance-password" ref={passwordPanelRef}>
           <div className="section-heading">
             <h2>{selectedName} 확인</h2>
           </div>
