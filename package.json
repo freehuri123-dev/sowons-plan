@@ -1,0 +1,15 @@
+{
+  "name": "sowon-family-plan",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "test": "node --test prototype/tests/schedule-core.test.js",
+    "start": "node prototype/server.js"
+  },
+  "dependencies": {
+    "pg": "^8.13.1"
+  },
+  "engines": {
+    "node": "24.x"
+  }
+}

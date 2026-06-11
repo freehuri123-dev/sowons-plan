@@ -1,0 +1,78 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>일정 추가 - 소원이네 일정판</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <main class="app-shell">
+      <header class="top-bar">
+        <div>
+          <p class="eyebrow">Sowon's Happy Plan</p>
+          <h1 id="pageTitle">일정 추가</h1>
+        </div>
+        <a class="icon-button link-icon" href="./index.html" title="캘린더로 돌아가기">‹</a>
+      </header>
+
+      <section class="form-panel" aria-labelledby="formTitle">
+        <div class="section-heading">
+          <h2 id="formTitle">새 일정</h2>
+          <button class="danger-button hidden" id="deleteButton" type="button">삭제</button>
+        </div>
+        <form id="eventForm" class="event-form">
+          <label>
+            <span>일정 이름</span>
+            <input id="eventTitle" name="title" placeholder="예: 가족 저녁" required />
+          </label>
+          <label>
+            <span>종류</span>
+            <select id="eventCategory" name="category"></select>
+          </label>
+          <label class="toggle-row">
+            <input id="eventNeedsResponse" name="needsResponse" type="checkbox" />
+            <span>참석 여부 받기</span>
+          </label>
+          <section class="visibility-panel" aria-label="보이는 사람">
+            <p class="field-title">보이는 사람</p>
+            <label class="toggle-row">
+              <input id="visibleAll" name="visibleAll" type="checkbox" checked />
+              <span>가족 전원</span>
+            </label>
+            <div class="visibility-members" id="visibilityMembers"></div>
+          </section>
+          <div class="field-row">
+            <label>
+              <span>날짜</span>
+              <input id="eventDate" name="date" type="date" required />
+            </label>
+            <label>
+              <span>시간</span>
+              <input id="eventTime" name="time" type="time" />
+            </label>
+          </div>
+          <label>
+            <span>메모</span>
+            <textarea id="eventNote" name="note" rows="3" placeholder="장소나 준비물을 적어두세요"></textarea>
+          </label>
+          <label>
+            <span>준비물 체크리스트</span>
+            <textarea id="eventChecklist" name="checklist" rows="3" placeholder="한 줄에 하나씩 적어주세요"></textarea>
+          </label>
+          <label>
+            <span>사진 첨부</span>
+            <input id="eventAttachment" name="attachment" type="file" accept="image/*" />
+          </label>
+          <p class="helper-text" id="attachmentName"></p>
+          <button class="primary-button" type="submit">저장</button>
+        </form>
+      </section>
+    </main>
+
+    <script src="./config.js"></script>
+    <script src="./schedule-core.js"></script>
+    <script src="./storage.js"></script>
+    <script src="./add.js"></script>
+  </body>
+</html>

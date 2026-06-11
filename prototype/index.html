@@ -1,0 +1,69 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>소원이네 일정판</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <main class="app-shell">
+      <header class="top-bar">
+        <div>
+          <p class="eyebrow">Sowon's Happy Plan</p>
+          <h1>소원이네 일정판</h1>
+        </div>
+        <button class="ghost-button compact-link hidden" id="logoutButton" type="button">나가기</button>
+      </header>
+
+      <section class="calendar-panel" aria-labelledby="calendarTitle">
+        <div class="section-heading">
+          <button class="icon-button" id="prevMonthButton" type="button" title="이전 달">‹</button>
+          <h2 id="calendarTitle">월별 일정</h2>
+          <button class="icon-button" id="nextMonthButton" type="button" title="다음 달">›</button>
+        </div>
+        <div class="weekday-row" aria-hidden="true">
+          <span>일</span>
+          <span>월</span>
+          <span>화</span>
+          <span>수</span>
+          <span>목</span>
+          <span>금</span>
+          <span>토</span>
+        </div>
+        <div id="calendarGrid" class="calendar-grid"></div>
+      </section>
+
+      <section class="events-section" aria-labelledby="eventsTitle">
+        <div class="section-heading">
+          <h2 id="eventsTitle">오늘의 일정</h2>
+          <div class="action-row hidden" id="parentActionRow">
+            <a class="ghost-link" href="./anniversaries.html">기념일 등록</a>
+            <a class="primary-link" href="./add.html">일정 추가</a>
+          </div>
+        </div>
+        <div id="eventsList" class="events-list"></div>
+      </section>
+    </main>
+
+    <template id="eventCardTemplate">
+      <article class="event-card">
+        <div class="event-card-main">
+          <div>
+            <p class="event-date"></p>
+            <h3 class="event-title"></h3>
+            <p class="event-note"></p>
+          </div>
+          <div class="event-actions"></div>
+        </div>
+        <div class="summary-row"></div>
+        <div class="member-grid"></div>
+      </article>
+    </template>
+
+    <script src="./config.js"></script>
+    <script src="./schedule-core.js"></script>
+    <script src="./storage.js"></script>
+    <script src="./app.js"></script>
+  </body>
+</html>

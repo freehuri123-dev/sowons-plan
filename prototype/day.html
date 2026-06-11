@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>날짜별 일정 - 소원이네 일정판</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <main class="app-shell">
+      <header class="top-bar">
+        <div>
+          <p class="eyebrow">Sowon's Happy Plan</p>
+          <h1 id="dayTitle">날짜별 일정</h1>
+        </div>
+        <a class="icon-button link-icon" href="./index.html" title="캘린더로 돌아가기">‹</a>
+      </header>
+
+      <section class="events-section">
+        <div class="section-heading">
+          <h2>이날의 일정</h2>
+          <a class="ghost-link" id="addEventLink" href="./add.html">일정 추가</a>
+        </div>
+        <div id="dayEventsList" class="events-list"></div>
+      </section>
+    </main>
+
+    <template id="eventCardTemplate">
+      <article class="event-card">
+        <div class="event-card-main">
+          <div>
+            <p class="event-date"></p>
+            <h3 class="event-title"></h3>
+            <p class="event-note"></p>
+          </div>
+        </div>
+        <div class="summary-row"></div>
+        <div class="member-grid"></div>
+        <div class="detail-actions">
+          <a class="ghost-link edit-link" href="./add.html">일정 수정</a>
+          <button class="danger-button delete-button" type="button">일정 삭제</button>
+        </div>
+      </article>
+    </template>
+
+    <script src="./config.js"></script>
+    <script src="./schedule-core.js"></script>
+    <script src="./storage.js"></script>
+    <script src="./day.js"></script>
+  </body>
+</html>

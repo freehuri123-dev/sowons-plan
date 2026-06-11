@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>기념일 등록 - 소원이네 일정판</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <main class="app-shell">
+      <header class="top-bar">
+        <div>
+          <p class="eyebrow">Special Days</p>
+          <h1>기념일 등록</h1>
+        </div>
+        <a class="icon-button link-icon" href="./parent.html" title="돌아가기">‹</a>
+      </header>
+
+      <section class="form-panel">
+        <div class="section-heading">
+          <h2>한 번에 여러 개 추가</h2>
+          <button class="ghost-button" id="addRowButton" type="button">줄 추가</button>
+        </div>
+        <form id="anniversaryForm" class="event-form">
+          <div id="anniversaryRows" class="anniversary-rows"></div>
+          <button class="primary-button" type="submit">저장</button>
+        </form>
+      </section>
+
+      <section class="events-section">
+        <div class="section-heading">
+          <h2>등록된 기념일</h2>
+        </div>
+        <div id="anniversaryList" class="events-list"></div>
+      </section>
+    </main>
+
+    <script src="./schedule-core.js"></script>
+    <script src="./storage.js"></script>
+    <script src="./anniversaries.js"></script>
+  </body>
+</html>

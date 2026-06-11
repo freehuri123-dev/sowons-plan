@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>소원이네 일정판</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body class="entrance-page">
+    <main class="app-shell entrance-shell">
+      <header class="entrance-logo" aria-label="SOWON'S HAPPY PLAN">
+        <p class="eyebrow">SOWON'S HAPPY PLAN</p>
+      </header>
+
+      <section class="entrance-hero" aria-label="소원이네 가족 그림">
+        <img src="./assets/family-entrance.jpg" alt="소원이네 가족 그림" />
+      </section>
+
+      <section class="entrance-actions">
+        <div class="person-grid">
+          <button class="person-button" type="button" data-role="child" data-name="소원이">소원이 입장</button>
+          <button class="person-button" type="button" data-role="parent" data-name="엄마">엄마 입장</button>
+          <button class="person-button" type="button" data-role="parent" data-name="아빠">아빠 입장</button>
+        </div>
+      </section>
+
+      <section class="entrance-password hidden" id="passwordPanel">
+        <div class="section-heading">
+          <h2 id="passwordTitle">확인</h2>
+        </div>
+        <form id="passwordForm" class="event-form">
+          <label>
+            <span>비밀번호</span>
+            <input id="startPassword" type="password" inputmode="numeric" required />
+          </label>
+          <p class="helper-text hidden" id="passwordError">비밀번호가 맞지 않아요.</p>
+          <button class="primary-button" type="submit">들어가기</button>
+        </form>
+      </section>
+    </main>
+
+    <script src="./schedule-core.js"></script>
+    <script src="./start.js"></script>
+  </body>
+</html>
