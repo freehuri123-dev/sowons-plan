@@ -20,6 +20,46 @@ body {
   background-size: 28px 28px, 28px 28px, auto;
 }
 
+body.page-ready {
+  animation: page-enter 180ms ease-out both;
+}
+
+body.page-leaving {
+  pointer-events: none;
+  animation: page-leave 150ms ease-in both;
+}
+
+@keyframes page-enter {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes page-leave {
+  from {
+    opacity: 1;
+    transform: translateY(0);
+  }
+
+  to {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  body.page-ready,
+  body.page-leaving {
+    animation: none;
+  }
+}
+
 button,
 input,
 select,

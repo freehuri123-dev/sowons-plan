@@ -14,7 +14,7 @@ document.querySelectorAll(".person-button").forEach((button) => {
     if (button.dataset.role === "child") {
       sessionStorage.removeItem(ADMIN_SESSION_KEY);
       sessionStorage.setItem(CURRENT_MEMBER_KEY, "sowon");
-      window.location.href = "./index.html";
+      window.familyNavigate("./index.html");
       return;
     }
 
@@ -34,7 +34,7 @@ passwordForm.addEventListener("submit", (event) => {
       CURRENT_MEMBER_KEY,
       selectedName === "엄마" ? "mom" : "dad"
     );
-    window.location.href = "./parent.html";
+    window.familyNavigate("./parent.html");
   } else {
     passwordError.classList.remove("hidden");
   }

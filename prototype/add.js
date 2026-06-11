@@ -34,7 +34,7 @@ function saveState() {
 }
 
 function redirectAfterSave(date) {
-  window.location.href = `./day.html?date=${date}`;
+  window.familyNavigate(`./day.html?date=${date}`);
 }
 
 function renderSelectOptions() {
@@ -222,7 +222,7 @@ deleteButton.addEventListener("click", async () => {
     (response) => response.eventId !== editingEvent.id
   );
   await saveState();
-  window.location.href = "./index.html";
+  window.familyNavigate("./index.html");
 });
 
 async function init() {

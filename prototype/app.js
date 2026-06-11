@@ -210,12 +210,12 @@ function renderTodayEvents() {
       card.querySelector(".event-note").after(meta);
 
       card.addEventListener("click", () => {
-        window.location.href = detailHref;
+        window.familyNavigate(detailHref);
       });
       card.addEventListener("keydown", (event) => {
         if (event.key === "Enter" || event.key === " ") {
           event.preventDefault();
-          window.location.href = detailHref;
+          window.familyNavigate(detailHref);
         }
       });
 
@@ -250,7 +250,7 @@ nextMonthButton.addEventListener("click", () => {
 logoutButton?.addEventListener("click", () => {
   sessionStorage.removeItem(ADMIN_SESSION_KEY);
   sessionStorage.removeItem(CURRENT_MEMBER_KEY);
-  window.location.href = "./start.html";
+  window.familyNavigate("./start.html");
 });
 
 async function init() {
