@@ -16,6 +16,7 @@ const {
   getVisibleEvents,
   isAdminPassword,
   normalizeState,
+  canRequestLocation,
 } = require("../schedule-core");
 
 test("sortEvents orders events by date and time", () => {
@@ -328,5 +329,19 @@ test("normalizeState preserves location requests", () => {
     completedAt: "",
     locationId: "",
     message: "",
+    requestLog: [],
   });
+});
+
+test("canRequestLocation blocks more than 3 requests in 10 minutes", () => {
+  const request = {
+    requestLog: [
+      "2026-06-12T09:00:00.000Z",
+      "2026-06-12T09:04:00.000Z",
+      "2026-06-12T09:08:00.000Z",
+    ],
+  };
+
+  assert.equal(canRequestLocation(request, "2026-06-12T09:09:00.000Z"), false);
+  assert.equal(canRequestLocation(request, "2026-06-12T09:11:00.000Z"), true);
 });

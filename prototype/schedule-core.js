@@ -289,6 +289,9 @@ function normalizeMemberLocation(value) {
 
 function normalizeLocationRequest(value) {
   if (!value || typeof value !== "object") return null;
+  const requestLog = Array.isArray(value.requestLog)
+    ? value.requestLog.filter(Boolean).map(String)
+    : [];
   return {
     id: value.id || `request-${Date.now()}`,
     status: ["pending", "completed", "failed"].includes(value.status)
@@ -299,7 +302,22 @@ function normalizeLocationRequest(value) {
     completedAt: value.completedAt || "",
     locationId: value.locationId || "",
     message: value.message || "",
+    requestLog,
   };
+}
+
+function canRequestLocation(request, now = new Date().toISOString()) {
+  const currentTime = new Date(now).getTime();
+  const requestLog = Array.isArray(request?.requestLog) ? request.requestLog : [];
+  const recentCount = requestLog.filter((requestedAt) => {
+    const requestedTime = new Date(requestedAt).getTime();
+    return (
+      Number.isFinite(requestedTime) &&
+      currentTime - requestedTime < 10 * 60 * 1000
+    );
+  }).length;
+
+  return recentCount < 3;
 }
 
 function normalizeState(value) {
@@ -352,6 +370,7 @@ const scheduleCore = {
   isAdminPassword,
   getVisibleEvents,
   normalizeState,
+  canRequestLocation,
 };
 
 if (typeof module !== "undefined") {

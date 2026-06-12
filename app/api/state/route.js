@@ -84,6 +84,9 @@ function normalizeMemberLocation(value) {
 
 function normalizeLocationRequest(value) {
   if (!value || typeof value !== "object") return null;
+  const requestLog = Array.isArray(value.requestLog)
+    ? value.requestLog.filter(Boolean).map(String)
+    : [];
   return {
     id: value.id || `request-${Date.now()}`,
     status: ["pending", "completed", "failed"].includes(value.status)
@@ -94,6 +97,7 @@ function normalizeLocationRequest(value) {
     completedAt: value.completedAt || "",
     locationId: value.locationId || "",
     message: value.message || "",
+    requestLog,
   };
 }
 

@@ -78,6 +78,9 @@ function normalizeMemberLocation(value) {
 
 function normalizeLocationRequest(value) {
   if (!value || typeof value !== "object") return null;
+  const requestLog = Array.isArray(value.requestLog)
+    ? value.requestLog.filter(Boolean).map(String)
+    : [];
   return {
     id: value.id || `request-${Date.now()}`,
     status: ["pending", "completed", "failed"].includes(value.status)
@@ -88,6 +91,7 @@ function normalizeLocationRequest(value) {
     completedAt: value.completedAt || "",
     locationId: value.locationId || "",
     message: value.message || "",
+    requestLog,
   };
 }
 
@@ -174,6 +178,32 @@ function sortLocationsRecentFirst(locations) {
   return [...locations].sort((left, right) =>
     String(right.updatedAt || "").localeCompare(String(left.updatedAt || ""))
   );
+}
+
+function canRequestLocation(request, now = new Date().toISOString()) {
+  const currentTime = new Date(now).getTime();
+  const requestLog = Array.isArray(request?.requestLog) ? request.requestLog : [];
+  const recentCount = requestLog.filter((requestedAt) => {
+    const requestedTime = new Date(requestedAt).getTime();
+    return (
+      Number.isFinite(requestedTime) &&
+      currentTime - requestedTime < 10 * 60 * 1000
+    );
+  }).length;
+
+  return recentCount < 3;
+}
+
+function getRecentLocationRequestLog(request, now = new Date().toISOString()) {
+  const currentTime = new Date(now).getTime();
+  const requestLog = Array.isArray(request?.requestLog) ? request.requestLog : [];
+  return requestLog.filter((requestedAt) => {
+    const requestedTime = new Date(requestedAt).getTime();
+    return (
+      Number.isFinite(requestedTime) &&
+      currentTime - requestedTime < 10 * 60 * 1000
+    );
+  });
 }
 
 function getLocationsForDate(locations, dateKey) {
@@ -431,13 +461,7 @@ function formatLocationTime(value) {
 }
 
 function formatLocationRequestStatus(request) {
-  if (request.status === "pending") {
-    return `${formatLocationTime(request.requestedAt)}에 요청했어요. 소원이 앱이 켜져 있으면 곧 저장돼요.`;
-  }
-  if (request.status === "completed") {
-    return `${formatLocationTime(request.completedAt)}에 현재 위치를 받았어요.`;
-  }
-  return "위치 요청을 처리하지 못했어요.";
+  return `${formatLocationTime(request.requestedAt)}에 요청했습니다.`;
 }
 
 function getCategory(event) {
@@ -1131,22 +1155,42 @@ function LocationView({ admin, memberId, navigate, saveState, state }) {
   async function requestCurrentLocation() {
     setRequesting(true);
     const requestedAt = new Date().toISOString();
-    await saveState((current) => ({
-      ...current,
-      locationRequests: {
-        ...(current.locationRequests || {}),
-        sowon: {
-          id: `request-${requestedAt}-${Math.random().toString(16).slice(2)}`,
-          status: "pending",
-          requestedAt,
-          requestedBy: memberId,
-          completedAt: "",
-          locationId: "",
-          message: "",
+    let blocked = false;
+    await saveState((current) => {
+      const currentRequest = normalizeLocationRequest(
+        current.locationRequests?.sowon
+      );
+      if (!canRequestLocation(currentRequest, requestedAt)) {
+        blocked = true;
+        return current;
+      }
+
+      const requestLog = [
+        ...getRecentLocationRequestLog(currentRequest, requestedAt),
+        requestedAt,
+      ];
+
+      return {
+        ...current,
+        locationRequests: {
+          ...(current.locationRequests || {}),
+          sowon: {
+            id: `request-${requestedAt}-${Math.random().toString(16).slice(2)}`,
+            status: "pending",
+            requestedAt,
+            requestedBy: memberId,
+            completedAt: "",
+            locationId: "",
+            message: "",
+            requestLog,
+          },
         },
-      },
-    }));
+      };
+    });
     setRequesting(false);
+    if (blocked) {
+      window.alert("10분 안에는 3번까지만 요청할 수 있어요.");
+    }
   }
 
   return (
@@ -1180,12 +1224,10 @@ function LocationView({ admin, memberId, navigate, saveState, state }) {
           <button
             className="primary-button"
             type="button"
-            disabled={requesting || locationRequest?.status === "pending"}
+            disabled={requesting}
             onClick={requestCurrentLocation}
           >
-            {locationRequest?.status === "pending"
-              ? "소원이 폰 확인 중"
-              : "현재 소원이 위치 찾기"}
+            현재 소원이 위치 찾기
           </button>
           {locationRequest ? (
             <p className="helper-text">
