@@ -681,6 +681,132 @@ textarea:focus {
   object-fit: cover;
 }
 
+.location-panel {
+  display: grid;
+  gap: 14px;
+  border: 2px solid #253047;
+  border-radius: 8px;
+  padding: 16px;
+  background: #fff;
+  box-shadow: 6px 6px 0 rgba(37, 48, 71, 0.12);
+}
+
+.location-help {
+  margin: 4px 0 0;
+  color: #536179;
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.location-summary {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 8px 12px;
+  border: 2px dashed #b8c6d8;
+  border-radius: 8px;
+  padding: 12px;
+  background: #fffef6;
+  color: #536179;
+  font-size: 13px;
+  font-weight: 900;
+}
+
+.location-summary strong {
+  color: #253047;
+}
+
+.location-filter {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 10px;
+  align-items: end;
+}
+
+.location-filter label {
+  display: grid;
+  gap: 6px;
+  color: #536179;
+  font-size: 13px;
+  font-weight: 900;
+}
+
+.map-shell {
+  position: relative;
+  overflow: hidden;
+  min-height: 340px;
+  border: 2px solid #253047;
+  border-radius: 8px;
+  background: #eaf4fb;
+}
+
+.naver-map {
+  min-height: 340px;
+  width: 100%;
+}
+
+.map-status {
+  position: absolute;
+  inset: 12px;
+  display: grid;
+  place-items: center;
+  border: 2px dashed #b8c6d8;
+  border-radius: 8px;
+  background: rgba(255, 254, 246, 0.92);
+  color: #253047;
+  font-size: 14px;
+  font-weight: 900;
+  text-align: center;
+}
+
+.location-list {
+  display: grid;
+  gap: 10px;
+}
+
+.location-item {
+  display: grid;
+  grid-template-columns: 34px 1fr;
+  gap: 10px;
+  align-items: start;
+  border: 2px dashed #b8c6d8;
+  border-radius: 8px;
+  padding: 10px;
+  background: #fffef6;
+}
+
+.location-number {
+  display: inline-grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border: 2px solid #253047;
+  border-radius: 999px;
+  background: #ffcb4d;
+  color: #253047;
+  font-size: 13px;
+  font-weight: 900;
+}
+
+.location-item strong {
+  display: block;
+  margin-bottom: 4px;
+  color: #253047;
+  font-size: 14px;
+}
+
+.location-item p {
+  margin: 0 0 4px;
+  color: #536179;
+  font-size: 14px;
+  line-height: 1.4;
+}
+
+.location-item small {
+  color: #7b8798;
+  font-size: 12px;
+  font-weight: 800;
+}
+
 .event-actions {
   display: flex;
   align-items: flex-start;
@@ -836,6 +962,10 @@ textarea:focus {
   }
 
   .anniversary-row {
+    grid-template-columns: 1fr;
+  }
+
+  .location-filter {
     grid-template-columns: 1fr;
   }
 

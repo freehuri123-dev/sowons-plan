@@ -15,6 +15,7 @@ const {
   createAnniversary,
   getVisibleEvents,
   isAdminPassword,
+  normalizeState,
 } = require("../schedule-core");
 
 test("sortEvents orders events by date and time", () => {
@@ -266,4 +267,43 @@ test("getVisibleEvents includes all-family events and member-specific events", (
     "mom",
     "legacy",
   ]);
+});
+
+test("normalizeState preserves member location history", () => {
+  const normalized = normalizeState({
+    events: [],
+    responses: [],
+    anniversaries: [],
+    locations: {
+      sowon: {
+        latest: { id: "loc-2", latitude: 37.5665, longitude: 126.978 },
+        history: [
+          { id: "loc-1", latitude: 37.565, longitude: 126.977 },
+          { id: "loc-2", latitude: 37.5665, longitude: 126.978 },
+        ],
+      },
+    },
+  });
+
+  assert.equal(normalized.locations.sowon.latest.id, "loc-2");
+  assert.deepEqual(
+    normalized.locations.sowon.history.map((location) => location.id),
+    ["loc-1", "loc-2"]
+  );
+});
+
+test("normalizeState migrates a legacy latest-only member location", () => {
+  const normalized = normalizeState({
+    locations: {
+      sowon: {
+        latitude: 37.5665,
+        longitude: 126.978,
+        accuracy: 20,
+        updatedAt: "2026-06-12T06:00:00.000Z",
+      },
+    },
+  });
+
+  assert.equal(normalized.locations.sowon.latest.latitude, 37.5665);
+  assert.equal(normalized.locations.sowon.history.length, 1);
 });

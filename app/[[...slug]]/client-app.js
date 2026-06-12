@@ -19,22 +19,77 @@ const CATEGORIES = [
 const STORAGE_KEY = "family-schedule-prototype";
 const ADMIN_SESSION_KEY = "family-admin-ok";
 const CURRENT_MEMBER_KEY = "family-current-member";
-const EMPTY_STATE = { events: [], responses: [], anniversaries: [] };
+const EMPTY_STATE = { events: [], responses: [], anniversaries: [], locations: {} };
 const STATUS_LABELS = { available: "가능", unavailable: "불가" };
+const NAVER_MAP_CLIENT_ID =
+  process.env.NEXT_PUBLIC_NAVER_MAP_CLIENT_ID ||
+  "u250WCxCRCRisrg3CCIhhq2lk1cMpKCWBn7Il3r3";
 
 function normalizePath(pathname) {
   const last = pathname.split("/").filter(Boolean).at(-1) || "start";
   return last.replace(".html", "") || "start";
 }
 
+function normalizeLocationEntry(value) {
+  if (!value || typeof value !== "object") return null;
+  const latitude = Number(value.latitude);
+  const longitude = Number(value.longitude);
+  if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) return null;
+
+  return {
+    id: value.id || `location-${value.updatedAt || Date.now()}-${latitude}-${longitude}`,
+    latitude,
+    longitude,
+    accuracy: Number.isFinite(Number(value.accuracy))
+      ? Number(value.accuracy)
+      : null,
+    updatedAt: value.updatedAt || new Date().toISOString(),
+    address: value.address || "",
+    source: value.source || "",
+  };
+}
+
+function normalizeMemberLocation(value) {
+  if (!value || typeof value !== "object") {
+    return { latest: null, history: [] };
+  }
+
+  const history = Array.isArray(value.history)
+    ? value.history.map(normalizeLocationEntry).filter(Boolean)
+    : [];
+  const legacyEntry = normalizeLocationEntry(value);
+  const mergedHistory = history.length > 0 ? history : legacyEntry ? [legacyEntry] : [];
+  const latest =
+    normalizeLocationEntry(value.latest) ||
+    mergedHistory
+      .slice()
+      .sort((left, right) => String(left.updatedAt).localeCompare(String(right.updatedAt)))
+      .at(-1) ||
+    null;
+
+  return { latest, history: mergedHistory };
+}
+
 function normalizeState(value) {
   const state = value && typeof value === "object" ? value : EMPTY_STATE;
+  const rawLocations =
+    state.locations && typeof state.locations === "object" && !Array.isArray(state.locations)
+      ? state.locations
+      : {};
+  const locations = Object.fromEntries(
+    Object.entries(rawLocations).map(([memberId, location]) => [
+      memberId,
+      normalizeMemberLocation(location),
+    ])
+  );
+
   return {
     events: Array.isArray(state.events) ? state.events : [],
     responses: Array.isArray(state.responses) ? state.responses : [],
     anniversaries: Array.isArray(state.anniversaries)
       ? state.anniversaries
       : [],
+    locations,
   };
 }
 
@@ -65,6 +120,51 @@ async function persistState(state) {
   });
   if (!response.ok) throw new Error(`Save failed: ${response.status}`);
   return normalizedState;
+}
+
+async function getCurrentPosition() {
+  const locationModule = await import("../mobile-location");
+  return locationModule.getCurrentMobilePosition();
+}
+
+function getLocationDateKey(location) {
+  return toDateKey(new Date(location.updatedAt || Date.now()));
+}
+
+function sortLocations(locations) {
+  return [...locations].sort((left, right) =>
+    String(left.updatedAt || "").localeCompare(String(right.updatedAt || ""))
+  );
+}
+
+function sortLocationsRecentFirst(locations) {
+  return [...locations].sort((left, right) =>
+    String(right.updatedAt || "").localeCompare(String(left.updatedAt || ""))
+  );
+}
+
+function getLocationsForDate(locations, dateKey) {
+  return sortLocations(locations).filter(
+    (location) => getLocationDateKey(location) === dateKey
+  );
+}
+
+function appendMemberLocation(current, memberId, location) {
+  const memberLocation = normalizeMemberLocation(current.locations?.[memberId]);
+  const entry = normalizeLocationEntry(location);
+  if (!entry) return current;
+
+  const history = sortLocations([...memberLocation.history, entry]).slice(-200);
+  return {
+    ...current,
+    locations: {
+      ...(current.locations || {}),
+      [memberId]: {
+        latest: history.at(-1) || entry,
+        history,
+      },
+    },
+  };
 }
 
 function sortEvents(events) {
@@ -287,6 +387,16 @@ function formatEventTime(event) {
   }).format(new Date(`${event.date}T${event.time}`));
 }
 
+function formatLocationTime(value) {
+  if (!value) return "확인 안 됨";
+  return new Intl.DateTimeFormat("ko-KR", {
+    month: "long",
+    day: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  }).format(new Date(value));
+}
+
 function getCategory(event) {
   return (
     CATEGORIES.find((category) => category.id === event.category) ||
@@ -324,6 +434,7 @@ export default function ClientApp() {
   const [memberId, setMemberId] = useState("sowon");
   const [selectedMonth, setSelectedMonth] = useState(getInitialMonth);
   const [loaded, setLoaded] = useState(false);
+  const locationSavedRef = useRef(false);
 
   useEffect(() => {
     setAdmin(sessionStorage.getItem(ADMIN_SESSION_KEY) === "1");
@@ -347,6 +458,38 @@ export default function ClientApp() {
     setState(nextState);
     await persistState(nextState);
   };
+
+  useEffect(() => {
+    if (
+      !loaded ||
+      memberId !== "sowon" ||
+      locationSavedRef.current ||
+      !window.Capacitor?.isNativePlatform?.()
+    ) {
+      return;
+    }
+
+    locationSavedRef.current = true;
+    getCurrentPosition()
+      .then(async (position) => {
+        if (!position) return;
+        const current = await refreshState().catch(() => state);
+        const nextState = normalizeState(
+          appendMemberLocation(current, "sowon", {
+            latitude: position.latitude,
+            longitude: position.longitude,
+            accuracy: position.accuracy,
+            updatedAt: new Date(position.timestamp || Date.now()).toISOString(),
+            source: "android",
+          })
+        );
+        setState(nextState);
+        await persistState(nextState);
+      })
+      .catch((error) =>
+        console.info("Sowon location auto-save skipped.", error)
+      );
+  }, [loaded, memberId, state]);
 
   const context = {
     admin,
@@ -387,6 +530,8 @@ export default function ClientApp() {
     view = <AddView {...context} />;
   } else if (route === "anniversaries") {
     view = <AnniversariesView {...context} />;
+  } else if (route === "location") {
+    view = <LocationView {...context} />;
   }
 
   return <div className="next-view">{loaded ? view : null}</div>;
@@ -611,6 +756,13 @@ function HomeView(props) {
           <h2 id="eventsTitle">오늘의 일정</h2>
           {admin ? (
             <div className="action-row">
+              <button
+                className="ghost-link"
+                type="button"
+                onClick={() => navigate("/location")}
+              >
+                소원이 위치
+              </button>
               <button
                 className="ghost-link"
                 type="button"
@@ -849,6 +1001,212 @@ function DayView(props) {
         )}
       </div>
     </main>
+  );
+}
+
+function LocationView({ admin, memberId, navigate, saveState, state }) {
+  const [selectedDate, setSelectedDate] = useState(todayKey());
+  const sowonLocation = normalizeMemberLocation(state.locations?.sowon);
+  const latestLocation = sowonLocation.latest;
+  const selectedLocations = getLocationsForDate(
+    sowonLocation.history,
+    selectedDate
+  );
+  const recentSelectedLocations = sortLocationsRecentFirst(selectedLocations);
+  const isSowon = memberId === "sowon";
+
+  useEffect(() => {
+    if (!admin) navigate(isSowon ? "/index" : "/");
+  }, [admin, isSowon, navigate]);
+
+  return (
+    <main className="app-shell">
+      <header className="top-bar">
+        <div>
+          <p className="eyebrow">Sowon&apos;s Happy Plan</p>
+          <h1>소원이 위치</h1>
+        </div>
+        <button
+          className="ghost-button"
+          type="button"
+          onClick={() => navigate(admin ? "/parent" : "/index")}
+        >
+          돌아가기
+        </button>
+      </header>
+
+      {admin ? (
+        <section className="location-panel">
+          <div className="section-heading">
+            <h2>지도 확인</h2>
+            <button
+              className="ghost-link"
+              type="button"
+              onClick={() => window.location.reload()}
+            >
+              새로고침
+            </button>
+          </div>
+
+          {latestLocation ? (
+            <>
+              <div className="location-summary">
+                <span>마지막 저장</span>
+                <strong>{formatLocationTime(latestLocation.updatedAt)}</strong>
+                <span>정확도</span>
+                <strong>
+                  {Number.isFinite(Number(latestLocation.accuracy))
+                    ? `약 ${Math.round(Number(latestLocation.accuracy))}m`
+                    : "확인 안 됨"}
+                </strong>
+                <span>전체 기록</span>
+                <strong>{sowonLocation.history.length}개</strong>
+              </div>
+              <div className="location-filter">
+                <label>
+                  <span>날짜 선택</span>
+                  <input
+                    type="date"
+                    value={selectedDate}
+                    onChange={(event) => setSelectedDate(event.target.value)}
+                  />
+                </label>
+              </div>
+              {selectedLocations.length > 0 ? (
+                <>
+                  <NaverMap locations={recentSelectedLocations} />
+                  <LocationList locations={recentSelectedLocations} />
+                </>
+              ) : (
+                <div className="empty-state">
+                  선택한 날짜에는 위치 기록이 없어요.
+                </div>
+              )}
+            </>
+          ) : (
+            <div className="empty-state">
+              아직 저장된 위치가 없어요. 소원이 폰에서 위치가 저장되면 지도가
+              보여요.
+            </div>
+          )}
+        </section>
+      ) : null}
+    </main>
+  );
+}
+
+function LocationList({ locations }) {
+  return (
+    <div className="location-list">
+      {locations.map((location, index) => (
+        <article className="location-item" key={location.id}>
+          <span className="location-number">{index + 1}</span>
+          <div>
+            <strong>{formatLocationTime(location.updatedAt)}</strong>
+            <p>{location.address || "주소 정보 없음"}</p>
+            <small>
+              {Number.isFinite(Number(location.accuracy))
+                ? `정확도 약 ${Math.round(Number(location.accuracy))}m`
+                : "정확도 확인 안 됨"}
+            </small>
+          </div>
+        </article>
+      ))}
+    </div>
+  );
+}
+
+function NaverMap({ locations }) {
+  const mapRef = useRef(null);
+  const [status, setStatus] = useState("loading");
+
+  useEffect(() => {
+    if (!locations?.length) return;
+    let cancelled = false;
+
+    function drawMap() {
+      if (cancelled || !mapRef.current || !window.naver?.maps) return;
+      const points = locations.map(
+        (location) =>
+          new window.naver.maps.LatLng(
+            Number(location.latitude),
+            Number(location.longitude)
+          )
+      );
+      const map = new window.naver.maps.Map(mapRef.current, {
+        center: points[0],
+        zoom: 16,
+        scaleControl: false,
+        logoControl: true,
+        mapDataControl: false,
+      });
+
+      points.forEach((point, index) => {
+        new window.naver.maps.Marker({
+          position: point,
+          map,
+          title: `소원이 위치 ${index + 1}`,
+          label: {
+            content: String(index + 1),
+            color: "#253047",
+            fontWeight: "900",
+          },
+        });
+      });
+
+      if (points.length > 1) {
+        const bounds = new window.naver.maps.LatLngBounds();
+        points.forEach((point) => bounds.extend(point));
+        map.fitBounds(bounds, { top: 44, right: 44, bottom: 44, left: 44 });
+      }
+      setStatus("ready");
+    }
+
+    if (window.naver?.maps) {
+      drawMap();
+      return () => {
+        cancelled = true;
+      };
+    }
+
+    const existingScript = document.getElementById("naver-map-script");
+    if (existingScript) {
+      existingScript.addEventListener("load", drawMap, { once: true });
+      existingScript.addEventListener("error", () => setStatus("error"), {
+        once: true,
+      });
+      return () => {
+        cancelled = true;
+        existingScript.removeEventListener("load", drawMap);
+      };
+    }
+
+    const script = document.createElement("script");
+    script.id = "naver-map-script";
+    script.src = `https://oapi.map.naver.com/openapi/v3/maps.js?ncpKeyId=${NAVER_MAP_CLIENT_ID}`;
+    script.async = true;
+    script.onload = drawMap;
+    script.onerror = () => setStatus("error");
+    document.head.appendChild(script);
+
+    return () => {
+      cancelled = true;
+    };
+  }, [locations]);
+
+  return (
+    <div className="map-shell">
+      <div className="naver-map" ref={mapRef} />
+      {status === "loading" ? (
+        <div className="map-status">지도를 불러오는 중이에요.</div>
+      ) : null}
+      {status === "error" ? (
+        <div className="map-status">
+          네이버지도를 불러오지 못했어요. Maps API 설정과 도메인을 확인해
+          주세요.
+        </div>
+      ) : null}
+    </div>
   );
 }
 

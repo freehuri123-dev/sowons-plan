@@ -1,10 +1,11 @@
 import { Pool } from "pg";
 
 const STATE_ID = "family-schedule";
-const EMPTY_STATE = { events: [], responses: [], anniversaries: [] };
+const EMPTY_STATE = { events: [], responses: [], anniversaries: [], locations: {} };
 
 let pool;
 let tableReady;
+let memoryState = EMPTY_STATE;
 
 function getConnectionString() {
   return (
@@ -35,14 +36,66 @@ function getPool() {
   return pool;
 }
 
+function normalizeLocationEntry(value) {
+  if (!value || typeof value !== "object") return null;
+  const latitude = Number(value.latitude);
+  const longitude = Number(value.longitude);
+  if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) return null;
+
+  return {
+    id: value.id || `location-${value.updatedAt || Date.now()}-${latitude}-${longitude}`,
+    latitude,
+    longitude,
+    accuracy: Number.isFinite(Number(value.accuracy))
+      ? Number(value.accuracy)
+      : null,
+    updatedAt: value.updatedAt || new Date().toISOString(),
+    address: value.address || "",
+    source: value.source || "",
+  };
+}
+
+function normalizeMemberLocation(value) {
+  if (!value || typeof value !== "object") {
+    return { latest: null, history: [] };
+  }
+
+  const history = Array.isArray(value.history)
+    ? value.history.map(normalizeLocationEntry).filter(Boolean)
+    : [];
+  const legacyEntry = normalizeLocationEntry(value);
+  const mergedHistory = history.length > 0 ? history : legacyEntry ? [legacyEntry] : [];
+  const latest =
+    normalizeLocationEntry(value.latest) ||
+    mergedHistory
+      .slice()
+      .sort((left, right) => String(left.updatedAt).localeCompare(String(right.updatedAt)))
+      .at(-1) ||
+    null;
+
+  return { latest, history: mergedHistory };
+}
+
 function normalizeState(value) {
   const state = value && typeof value === "object" ? value : EMPTY_STATE;
+  const rawLocations =
+    state.locations && typeof state.locations === "object" && !Array.isArray(state.locations)
+      ? state.locations
+      : {};
+  const locations = Object.fromEntries(
+    Object.entries(rawLocations).map(([memberId, location]) => [
+      memberId,
+      normalizeMemberLocation(location),
+    ])
+  );
+
   return {
     events: Array.isArray(state.events) ? state.events : [],
     responses: Array.isArray(state.responses) ? state.responses : [],
     anniversaries: Array.isArray(state.anniversaries)
       ? state.anniversaries
       : [],
+    locations,
   };
 }
 
@@ -61,6 +114,12 @@ async function ensureTable() {
 
 export async function GET() {
   try {
+    if (!getConnectionString()) {
+      return Response.json(normalizeState(memoryState), {
+        headers: { "Cache-Control": "no-store" },
+      });
+    }
+
     await ensureTable();
     const result = await getPool().query(
       "SELECT data FROM family_app_state WHERE id = $1",
@@ -80,6 +139,13 @@ export async function GET() {
 
 export async function PUT(request) {
   try {
+    if (!getConnectionString()) {
+      memoryState = normalizeState(await request.json());
+      return Response.json(memoryState, {
+        headers: { "Cache-Control": "no-store" },
+      });
+    }
+
     await ensureTable();
     const state = normalizeState(await request.json());
     await getPool().query(

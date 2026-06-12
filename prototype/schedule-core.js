@@ -239,6 +239,71 @@ function getVisibleEvents(events, memberId) {
   return events.filter((event) => isEventVisibleTo(event, memberId));
 }
 
+const EMPTY_STATE = { events: [], responses: [], anniversaries: [], locations: {} };
+
+function normalizeLocationEntry(value) {
+  if (!value || typeof value !== "object") return null;
+  const latitude = Number(value.latitude);
+  const longitude = Number(value.longitude);
+  if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) return null;
+
+  return {
+    id: value.id || `location-${value.updatedAt || Date.now()}-${latitude}-${longitude}`,
+    latitude,
+    longitude,
+    accuracy: Number.isFinite(Number(value.accuracy))
+      ? Number(value.accuracy)
+      : null,
+    updatedAt: value.updatedAt || new Date().toISOString(),
+    address: value.address || "",
+    source: value.source || "",
+  };
+}
+
+function normalizeMemberLocation(value) {
+  if (!value || typeof value !== "object") {
+    return { latest: null, history: [] };
+  }
+
+  const history = Array.isArray(value.history)
+    ? value.history.map(normalizeLocationEntry).filter(Boolean)
+    : [];
+  const legacyEntry = normalizeLocationEntry(value);
+  const mergedHistory = history.length > 0 ? history : legacyEntry ? [legacyEntry] : [];
+  const latest =
+    normalizeLocationEntry(value.latest) ||
+    mergedHistory
+      .slice()
+      .sort((left, right) => String(left.updatedAt).localeCompare(String(right.updatedAt)))
+      .at(-1) ||
+    null;
+
+  return { latest, history: mergedHistory };
+}
+
+function normalizeState(value) {
+  const state = value && typeof value === "object" ? value : EMPTY_STATE;
+  const rawLocations =
+    state.locations && typeof state.locations === "object" && !Array.isArray(state.locations)
+      ? state.locations
+      : {};
+  const locations = Object.fromEntries(
+    Object.entries(rawLocations).map(([memberId, location]) => [
+      memberId,
+      normalizeMemberLocation(location),
+    ])
+  );
+
+  return {
+    events: Array.isArray(state.events) ? state.events : [],
+    responses: Array.isArray(state.responses) ? state.responses : [],
+    anniversaries: Array.isArray(state.anniversaries)
+      ? state.anniversaries
+      : [],
+    locations,
+  };
+}
+
 const scheduleCore = {
   sortEvents,
   setResponse,
@@ -253,6 +318,7 @@ const scheduleCore = {
   getRecurringAnniversaryEventsForYear,
   isAdminPassword,
   getVisibleEvents,
+  normalizeState,
 };
 
 if (typeof module !== "undefined") {
