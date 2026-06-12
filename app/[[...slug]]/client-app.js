@@ -30,6 +30,7 @@ const STATUS_LABELS = { available: "가능", unavailable: "불가" };
 const NAVER_MAP_CLIENT_ID =
   process.env.NEXT_PUBLIC_NAVER_MAP_CLIENT_ID ||
   "u250WCxCRCRisrg3CCIhhq2lk1cMpKCWBn7Il3r3";
+const NAVER_MAP_SCRIPT_URL = `https://oapi.map.naver.com/openapi/v3/maps.js?ncpKeyId=${NAVER_MAP_CLIENT_ID}&submodules=geocoder`;
 
 function normalizePath(pathname) {
   const last = pathname.split("/").filter(Boolean).at(-1) || "start";
@@ -204,6 +205,44 @@ function getRecentLocationRequestLog(request, now = new Date().toISOString()) {
       currentTime - requestedTime < 10 * 60 * 1000
     );
   });
+}
+
+function getCoordinateLabel(location) {
+  const latitude = Number(location.latitude);
+  const longitude = Number(location.longitude);
+  if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) {
+    return "위치 정보 없음";
+  }
+  return `${latitude.toFixed(5)}, ${longitude.toFixed(5)}`;
+}
+
+function loadNaverMapsScript(onLoad, onError) {
+  if (window.naver?.maps) {
+    onLoad();
+    return () => {};
+  }
+
+  const existingScript = document.getElementById("naver-map-script");
+  if (existingScript) {
+    existingScript.addEventListener("load", onLoad, { once: true });
+    existingScript.addEventListener("error", onError, { once: true });
+    return () => {
+      existingScript.removeEventListener("load", onLoad);
+      existingScript.removeEventListener("error", onError);
+    };
+  }
+
+  const script = document.createElement("script");
+  script.id = "naver-map-script";
+  script.src = NAVER_MAP_SCRIPT_URL;
+  script.async = true;
+  script.onload = onLoad;
+  script.onerror = onError;
+  document.head.appendChild(script);
+  return () => {
+    script.onload = null;
+    script.onerror = null;
+  };
 }
 
 function getLocationsForDate(locations, dateKey) {
@@ -1283,6 +1322,68 @@ function LocationView({ admin, memberId, navigate, saveState, state }) {
 }
 
 function LocationList({ locations }) {
+  const [resolvedAddresses, setResolvedAddresses] = useState({});
+
+  useEffect(() => {
+    const unresolvedLocations = locations.filter(
+      (location) => !location.address && !resolvedAddresses[location.id]
+    );
+    if (unresolvedLocations.length === 0) return;
+
+    let cancelled = false;
+    function resolveAddresses() {
+      if (!window.naver?.maps?.Service?.reverseGeocode) return;
+
+      unresolvedLocations.forEach((location) => {
+        const coords = new window.naver.maps.LatLng(
+          Number(location.latitude),
+          Number(location.longitude)
+        );
+        window.naver.maps.Service.reverseGeocode(
+          {
+            coords,
+            orders: [
+              window.naver.maps.Service.OrderType.ROAD_ADDR,
+              window.naver.maps.Service.OrderType.ADDR,
+            ].join(","),
+          },
+          (status, response) => {
+            if (cancelled) return;
+            const okStatus = window.naver.maps.Service.Status.OK;
+            const address =
+              status === okStatus
+                ? response.v2?.address?.roadAddress ||
+                  response.v2?.address?.jibunAddress ||
+                  ""
+                : "";
+            setResolvedAddresses((current) => ({
+              ...current,
+              [location.id]: address || getCoordinateLabel(location),
+            }));
+          }
+        );
+      });
+    }
+
+    const cleanup = loadNaverMapsScript(resolveAddresses, () => {
+      if (cancelled) return;
+      setResolvedAddresses((current) => ({
+        ...current,
+        ...Object.fromEntries(
+          unresolvedLocations.map((location) => [
+            location.id,
+            getCoordinateLabel(location),
+          ])
+        ),
+      }));
+    });
+
+    return () => {
+      cancelled = true;
+      cleanup();
+    };
+  }, [locations, resolvedAddresses]);
+
   return (
     <div className="location-list">
       {locations.map((location, index) => (
@@ -1290,7 +1391,11 @@ function LocationList({ locations }) {
           <span className="location-number">{index + 1}</span>
           <div>
             <strong>{formatLocationTime(location.updatedAt)}</strong>
-            <p>{location.address || "주소 정보 없음"}</p>
+            <p>
+              {location.address ||
+                resolvedAddresses[location.id] ||
+                "주소 확인 중"}
+            </p>
             <small>
               {Number.isFinite(Number(location.accuracy))
                 ? `정확도 약 ${Math.round(Number(location.accuracy))}m`
@@ -1349,35 +1454,11 @@ function NaverMap({ locations }) {
       setStatus("ready");
     }
 
-    if (window.naver?.maps) {
-      drawMap();
-      return () => {
-        cancelled = true;
-      };
-    }
-
-    const existingScript = document.getElementById("naver-map-script");
-    if (existingScript) {
-      existingScript.addEventListener("load", drawMap, { once: true });
-      existingScript.addEventListener("error", () => setStatus("error"), {
-        once: true,
-      });
-      return () => {
-        cancelled = true;
-        existingScript.removeEventListener("load", drawMap);
-      };
-    }
-
-    const script = document.createElement("script");
-    script.id = "naver-map-script";
-    script.src = `https://oapi.map.naver.com/openapi/v3/maps.js?ncpKeyId=${NAVER_MAP_CLIENT_ID}`;
-    script.async = true;
-    script.onload = drawMap;
-    script.onerror = () => setStatus("error");
-    document.head.appendChild(script);
+    const cleanup = loadNaverMapsScript(drawMap, () => setStatus("error"));
 
     return () => {
       cancelled = true;
+      cleanup();
     };
   }, [locations]);
 
