@@ -216,6 +216,10 @@ function getCoordinateLabel(location) {
   return `${latitude.toFixed(5)}, ${longitude.toFixed(5)}`;
 }
 
+function getAddressUnavailableLabel() {
+  return "주소 변환 권한 확인 필요";
+}
+
 function loadNaverMapsScript(onLoad, onError) {
   if (window.naver?.maps) {
     onLoad();
@@ -1358,7 +1362,7 @@ function LocationList({ locations }) {
                 : "";
             setResolvedAddresses((current) => ({
               ...current,
-              [location.id]: address || getCoordinateLabel(location),
+              [location.id]: address || getAddressUnavailableLabel(),
             }));
           }
         );
@@ -1372,7 +1376,7 @@ function LocationList({ locations }) {
         ...Object.fromEntries(
           unresolvedLocations.map((location) => [
             location.id,
-            getCoordinateLabel(location),
+            getAddressUnavailableLabel(),
           ])
         ),
       }));
