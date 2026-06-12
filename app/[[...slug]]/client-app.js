@@ -29,7 +29,7 @@ const EMPTY_STATE = {
 const STATUS_LABELS = { available: "가능", unavailable: "불가" };
 const NAVER_MAP_CLIENT_ID =
   process.env.NEXT_PUBLIC_NAVER_MAP_CLIENT_ID ||
-  "u250WCxCRCRisrg3CCIhhq2lk1cMpKCWBn7Il3r3";
+  "21ilabssnu";
 const NAVER_MAP_SCRIPT_URL = `https://oapi.map.naver.com/openapi/v3/maps.js?ncpKeyId=${NAVER_MAP_CLIENT_ID}`;
 
 function normalizePath(pathname) {
