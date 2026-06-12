@@ -30,7 +30,7 @@ const STATUS_LABELS = { available: "가능", unavailable: "불가" };
 const NAVER_MAP_CLIENT_ID =
   process.env.NEXT_PUBLIC_NAVER_MAP_CLIENT_ID ||
   "u250WCxCRCRisrg3CCIhhq2lk1cMpKCWBn7Il3r3";
-const NAVER_MAP_SCRIPT_URL = `https://oapi.map.naver.com/openapi/v3/maps.js?ncpKeyId=${NAVER_MAP_CLIENT_ID}&submodules=geocoder`;
+const NAVER_MAP_SCRIPT_URL = `https://oapi.map.naver.com/openapi/v3/maps.js?ncpKeyId=${NAVER_MAP_CLIENT_ID}`;
 
 function normalizePath(pathname) {
   const last = pathname.split("/").filter(Boolean).at(-1) || "start";
@@ -207,17 +207,8 @@ function getRecentLocationRequestLog(request, now = new Date().toISOString()) {
   });
 }
 
-function getCoordinateLabel(location) {
-  const latitude = Number(location.latitude);
-  const longitude = Number(location.longitude);
-  if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) {
-    return "위치 정보 없음";
-  }
-  return `${latitude.toFixed(5)}, ${longitude.toFixed(5)}`;
-}
-
 function getAddressUnavailableLabel() {
-  return "주소 변환 권한 확인 필요";
+  return "주소 변환 설정 필요";
 }
 
 function loadNaverMapsScript(onLoad, onError) {
@@ -1335,56 +1326,48 @@ function LocationList({ locations }) {
     if (unresolvedLocations.length === 0) return;
 
     let cancelled = false;
-    function resolveAddresses() {
-      if (!window.naver?.maps?.Service?.reverseGeocode) return;
-
-      unresolvedLocations.forEach((location) => {
-        const coords = new window.naver.maps.LatLng(
-          Number(location.latitude),
-          Number(location.longitude)
-        );
-        window.naver.maps.Service.reverseGeocode(
-          {
-            coords,
-            orders: [
-              window.naver.maps.Service.OrderType.ROAD_ADDR,
-              window.naver.maps.Service.OrderType.ADDR,
-            ].join(","),
-          },
-          (status, response) => {
-            if (cancelled) return;
-            const okStatus = window.naver.maps.Service.Status.OK;
-            const address =
-              status === okStatus
-                ? response.v2?.address?.roadAddress ||
-                  response.v2?.address?.jibunAddress ||
-                  ""
-                : "";
-            setResolvedAddresses((current) => ({
-              ...current,
-              [location.id]: address || getAddressUnavailableLabel(),
-            }));
+    async function resolveAddresses() {
+      const addressEntries = await Promise.all(
+        unresolvedLocations.map(async (location) => {
+          const latitude = Number(location.latitude);
+          const longitude = Number(location.longitude);
+          if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) {
+            return [location.id, "위치 정보 없음"];
           }
-        );
-      });
-    }
 
-    const cleanup = loadNaverMapsScript(resolveAddresses, () => {
+          try {
+            const params = new URLSearchParams({
+              lat: String(latitude),
+              lng: String(longitude),
+            });
+            const response = await fetch(`/api/reverse-geocode?${params}`, {
+              cache: "no-store",
+            });
+            if (!response.ok) {
+              return [location.id, getAddressUnavailableLabel()];
+            }
+            const data = await response.json();
+            return [
+              location.id,
+              data.address || getAddressUnavailableLabel(),
+            ];
+          } catch {
+            return [location.id, getAddressUnavailableLabel()];
+          }
+        })
+      );
+
       if (cancelled) return;
       setResolvedAddresses((current) => ({
         ...current,
-        ...Object.fromEntries(
-          unresolvedLocations.map((location) => [
-            location.id,
-            getAddressUnavailableLabel(),
-          ])
-        ),
+        ...Object.fromEntries(addressEntries),
       }));
-    });
+    }
+
+    resolveAddresses();
 
     return () => {
       cancelled = true;
-      cleanup();
     };
   }, [locations, resolvedAddresses]);
 
