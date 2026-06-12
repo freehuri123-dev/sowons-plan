@@ -60,7 +60,7 @@ export async function GET(request) {
   });
 
   const response = await fetch(
-    `https://naveropenapi.apigw.ntruss.com/map-reversegeocode/v2/gc?${params}`,
+    `https://maps.apigw.ntruss.com/map-reversegeocode/v2/gc?${params}`,
     {
       headers: {
         "X-NCP-APIGW-API-KEY-ID": clientId,
