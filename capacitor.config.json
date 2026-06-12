@@ -1,6 +1,6 @@
 {
   "appId": "com.sowon.plan",
-  "appName": "Sowon's Happy Plan",
+  "appName": "소원이네알림판",
   "webDir": "public",
   "server": {
     "url": "https://sowons-plan.vercel.app",

@@ -537,7 +537,6 @@ export default function ClientApp() {
   const [loaded, setLoaded] = useState(false);
   const [nativeApp, setNativeApp] = useState(false);
   const locationSavedRef = useRef(false);
-  const handledLocationRequestRef = useRef("");
 
   useEffect(() => {
     setAdmin(sessionStorage.getItem(ADMIN_SESSION_KEY) === "1");
@@ -563,7 +562,7 @@ export default function ClientApp() {
     await persistState(nextState);
   };
 
-  async function saveSowonLocation({ request } = {}) {
+  async function saveSowonLocation() {
     const position = await getCurrentPosition();
     if (!position) return null;
 
@@ -577,22 +576,9 @@ export default function ClientApp() {
         longitude: position.longitude,
         accuracy: position.accuracy,
         updatedAt,
-        source: request ? "android-request" : "android",
+        source: "android",
       })
     );
-
-    if (request) {
-      nextState.locationRequests = {
-        ...(nextState.locationRequests || {}),
-        sowon: {
-          ...request,
-          status: "completed",
-          completedAt: updatedAt,
-          locationId,
-          message: "",
-        },
-      };
-    }
 
     setState(nextState);
     await persistState(nextState);
@@ -614,40 +600,6 @@ export default function ClientApp() {
       .catch((error) =>
         console.info("Sowon location auto-save skipped.", error)
       );
-  }, [loaded, memberId, nativeApp]);
-
-  useEffect(() => {
-    if (!loaded || memberId !== "sowon" || !nativeApp) return;
-
-    let stopped = false;
-    async function checkLocationRequest() {
-      try {
-        const current = await refreshState();
-        const request = normalizeLocationRequest(
-          current.locationRequests?.sowon
-        );
-        if (
-          stopped ||
-          !request ||
-          request.status !== "pending" ||
-          handledLocationRequestRef.current === request.id
-        ) {
-          return;
-        }
-
-        handledLocationRequestRef.current = request.id;
-        await saveSowonLocation({ request });
-      } catch (error) {
-        console.info("Sowon location request check skipped.", error);
-      }
-    }
-
-    checkLocationRequest();
-    const timerId = window.setInterval(checkLocationRequest, 15000);
-    return () => {
-      stopped = true;
-      window.clearInterval(timerId);
-    };
   }, [loaded, memberId, nativeApp]);
 
   const context = {
@@ -1169,12 +1121,8 @@ function DayView(props) {
 
 function LocationView({ admin, memberId, navigate, saveState, state }) {
   const [selectedDate, setSelectedDate] = useState(todayKey());
-  const [requesting, setRequesting] = useState(false);
   const sowonLocation = normalizeMemberLocation(state.locations?.sowon);
   const latestLocation = sowonLocation.latest;
-  const locationRequest = normalizeLocationRequest(
-    state.locationRequests?.sowon
-  );
   const selectedLocations = getLocationsForDate(
     sowonLocation.history,
     selectedDate
@@ -1185,47 +1133,6 @@ function LocationView({ admin, memberId, navigate, saveState, state }) {
   useEffect(() => {
     if (!admin) navigate(isSowon ? "/index" : "/");
   }, [admin, isSowon, navigate]);
-
-  async function requestCurrentLocation() {
-    setRequesting(true);
-    const requestedAt = new Date().toISOString();
-    let blocked = false;
-    await saveState((current) => {
-      const currentRequest = normalizeLocationRequest(
-        current.locationRequests?.sowon
-      );
-      if (!canRequestLocation(currentRequest, requestedAt)) {
-        blocked = true;
-        return current;
-      }
-
-      const requestLog = [
-        ...getRecentLocationRequestLog(currentRequest, requestedAt),
-        requestedAt,
-      ];
-
-      return {
-        ...current,
-        locationRequests: {
-          ...(current.locationRequests || {}),
-          sowon: {
-            id: `request-${requestedAt}-${Math.random().toString(16).slice(2)}`,
-            status: "pending",
-            requestedAt,
-            requestedBy: memberId,
-            completedAt: "",
-            locationId: "",
-            message: "",
-            requestLog,
-          },
-        },
-      };
-    });
-    setRequesting(false);
-    if (blocked) {
-      window.alert("10분 안에는 3번까지만 요청할 수 있어요.");
-    }
-  }
 
   return (
     <main className="app-shell">
@@ -1255,19 +1162,6 @@ function LocationView({ admin, memberId, navigate, saveState, state }) {
               새로고침
             </button>
           </div>
-          <button
-            className="primary-button"
-            type="button"
-            disabled={requesting}
-            onClick={requestCurrentLocation}
-          >
-            현재 소원이 위치 찾기
-          </button>
-          {locationRequest ? (
-            <p className="helper-text">
-              {formatLocationRequestStatus(locationRequest)}
-            </p>
-          ) : null}
 
           {latestLocation ? (
             <>
