@@ -19,7 +19,13 @@ const CATEGORIES = [
 const STORAGE_KEY = "family-schedule-prototype";
 const ADMIN_SESSION_KEY = "family-admin-ok";
 const CURRENT_MEMBER_KEY = "family-current-member";
-const EMPTY_STATE = { events: [], responses: [], anniversaries: [], locations: {} };
+const EMPTY_STATE = {
+  events: [],
+  responses: [],
+  anniversaries: [],
+  locations: {},
+  locationRequests: {},
+};
 const STATUS_LABELS = { available: "가능", unavailable: "불가" };
 const NAVER_MAP_CLIENT_ID =
   process.env.NEXT_PUBLIC_NAVER_MAP_CLIENT_ID ||
@@ -70,6 +76,21 @@ function normalizeMemberLocation(value) {
   return { latest, history: mergedHistory };
 }
 
+function normalizeLocationRequest(value) {
+  if (!value || typeof value !== "object") return null;
+  return {
+    id: value.id || `request-${Date.now()}`,
+    status: ["pending", "completed", "failed"].includes(value.status)
+      ? value.status
+      : "pending",
+    requestedAt: value.requestedAt || new Date().toISOString(),
+    requestedBy: value.requestedBy || "",
+    completedAt: value.completedAt || "",
+    locationId: value.locationId || "",
+    message: value.message || "",
+  };
+}
+
 function normalizeState(value) {
   const state = value && typeof value === "object" ? value : EMPTY_STATE;
   const rawLocations =
@@ -82,6 +103,17 @@ function normalizeState(value) {
       normalizeMemberLocation(location),
     ])
   );
+  const rawLocationRequests =
+    state.locationRequests &&
+    typeof state.locationRequests === "object" &&
+    !Array.isArray(state.locationRequests)
+      ? state.locationRequests
+      : {};
+  const locationRequests = Object.fromEntries(
+    Object.entries(rawLocationRequests)
+      .map(([memberId, request]) => [memberId, normalizeLocationRequest(request)])
+      .filter(([, request]) => request)
+  );
 
   return {
     events: Array.isArray(state.events) ? state.events : [],
@@ -90,6 +122,7 @@ function normalizeState(value) {
       ? state.anniversaries
       : [],
     locations,
+    locationRequests,
   };
 }
 
@@ -397,6 +430,16 @@ function formatLocationTime(value) {
   }).format(new Date(value));
 }
 
+function formatLocationRequestStatus(request) {
+  if (request.status === "pending") {
+    return `${formatLocationTime(request.requestedAt)}에 요청했어요. 소원이 앱이 켜져 있으면 곧 저장돼요.`;
+  }
+  if (request.status === "completed") {
+    return `${formatLocationTime(request.completedAt)}에 현재 위치를 받았어요.`;
+  }
+  return "위치 요청을 처리하지 못했어요.";
+}
+
 function getCategory(event) {
   return (
     CATEGORIES.find((category) => category.id === event.category) ||
@@ -434,11 +477,14 @@ export default function ClientApp() {
   const [memberId, setMemberId] = useState("sowon");
   const [selectedMonth, setSelectedMonth] = useState(getInitialMonth);
   const [loaded, setLoaded] = useState(false);
+  const [nativeApp, setNativeApp] = useState(false);
   const locationSavedRef = useRef(false);
+  const handledLocationRequestRef = useRef("");
 
   useEffect(() => {
     setAdmin(sessionStorage.getItem(ADMIN_SESSION_KEY) === "1");
     setMemberId(sessionStorage.getItem(CURRENT_MEMBER_KEY) || "sowon");
+    setNativeApp(Boolean(window.Capacitor?.isNativePlatform?.()));
     setState(loadCachedState());
     setLoaded(true);
     refreshState()
@@ -459,6 +505,42 @@ export default function ClientApp() {
     await persistState(nextState);
   };
 
+  async function saveSowonLocation({ request } = {}) {
+    const position = await getCurrentPosition();
+    if (!position) return null;
+
+    const current = await refreshState().catch(() => state);
+    const updatedAt = new Date(position.timestamp || Date.now()).toISOString();
+    const locationId = `location-${updatedAt}-${Math.random().toString(16).slice(2)}`;
+    const nextState = normalizeState(
+      appendMemberLocation(current, "sowon", {
+        id: locationId,
+        latitude: position.latitude,
+        longitude: position.longitude,
+        accuracy: position.accuracy,
+        updatedAt,
+        source: request ? "android-request" : "android",
+      })
+    );
+
+    if (request) {
+      nextState.locationRequests = {
+        ...(nextState.locationRequests || {}),
+        sowon: {
+          ...request,
+          status: "completed",
+          completedAt: updatedAt,
+          locationId,
+          message: "",
+        },
+      };
+    }
+
+    setState(nextState);
+    await persistState(nextState);
+    return nextState;
+  }
+
   useEffect(() => {
     if (
       !loaded ||
@@ -470,26 +552,45 @@ export default function ClientApp() {
     }
 
     locationSavedRef.current = true;
-    getCurrentPosition()
-      .then(async (position) => {
-        if (!position) return;
-        const current = await refreshState().catch(() => state);
-        const nextState = normalizeState(
-          appendMemberLocation(current, "sowon", {
-            latitude: position.latitude,
-            longitude: position.longitude,
-            accuracy: position.accuracy,
-            updatedAt: new Date(position.timestamp || Date.now()).toISOString(),
-            source: "android",
-          })
-        );
-        setState(nextState);
-        await persistState(nextState);
-      })
+    saveSowonLocation()
       .catch((error) =>
         console.info("Sowon location auto-save skipped.", error)
       );
-  }, [loaded, memberId, state]);
+  }, [loaded, memberId, nativeApp]);
+
+  useEffect(() => {
+    if (!loaded || memberId !== "sowon" || !nativeApp) return;
+
+    let stopped = false;
+    async function checkLocationRequest() {
+      try {
+        const current = await refreshState();
+        const request = normalizeLocationRequest(
+          current.locationRequests?.sowon
+        );
+        if (
+          stopped ||
+          !request ||
+          request.status !== "pending" ||
+          handledLocationRequestRef.current === request.id
+        ) {
+          return;
+        }
+
+        handledLocationRequestRef.current = request.id;
+        await saveSowonLocation({ request });
+      } catch (error) {
+        console.info("Sowon location request check skipped.", error);
+      }
+    }
+
+    checkLocationRequest();
+    const timerId = window.setInterval(checkLocationRequest, 15000);
+    return () => {
+      stopped = true;
+      window.clearInterval(timerId);
+    };
+  }, [loaded, memberId, nativeApp]);
 
   const context = {
     admin,
@@ -502,6 +603,7 @@ export default function ClientApp() {
     setSelectedMonth,
     navigate,
     searchParams,
+    nativeApp,
     setSession(nextMemberId, isAdmin) {
       if (isAdmin) {
         sessionStorage.setItem(ADMIN_SESSION_KEY, "1");
@@ -537,7 +639,7 @@ export default function ClientApp() {
   return <div className="next-view">{loaded ? view : null}</div>;
 }
 
-function StartView({ setSession, navigate }) {
+function StartView({ nativeApp, setSession, navigate }) {
   const [selectedName, setSelectedName] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState(false);
@@ -585,31 +687,34 @@ function StartView({ setSession, navigate }) {
       </section>
       <section className="entrance-actions">
         <div className="person-grid">
-          <button
-            className="person-button"
-            data-name="소원이"
-            type="button"
-            onClick={enterChild}
-          >
-            소원이 입장
-          </button>
-          {["엄마", "아빠"].map((name) => (
+          {nativeApp ? (
             <button
               className="person-button"
-              data-name={name}
-              key={name}
+              data-name="소원이"
               type="button"
-              onClick={() => {
-                setSelectedName(name);
-                setError(false);
-              }}
+              onClick={enterChild}
             >
-              {name} 입장
+              입장하기
             </button>
-          ))}
+          ) : (
+            ["엄마", "아빠"].map((name) => (
+              <button
+                className="person-button"
+                data-name={name}
+                key={name}
+                type="button"
+                onClick={() => {
+                  setSelectedName(name);
+                  setError(false);
+                }}
+              >
+                {name} 입장
+              </button>
+            ))
+          )}
         </div>
       </section>
-      {selectedName ? (
+      {!nativeApp && selectedName ? (
         <section className="entrance-password" ref={passwordPanelRef}>
           <div className="section-heading">
             <h2>{selectedName} 확인</h2>
@@ -1006,8 +1111,12 @@ function DayView(props) {
 
 function LocationView({ admin, memberId, navigate, saveState, state }) {
   const [selectedDate, setSelectedDate] = useState(todayKey());
+  const [requesting, setRequesting] = useState(false);
   const sowonLocation = normalizeMemberLocation(state.locations?.sowon);
   const latestLocation = sowonLocation.latest;
+  const locationRequest = normalizeLocationRequest(
+    state.locationRequests?.sowon
+  );
   const selectedLocations = getLocationsForDate(
     sowonLocation.history,
     selectedDate
@@ -1018,6 +1127,27 @@ function LocationView({ admin, memberId, navigate, saveState, state }) {
   useEffect(() => {
     if (!admin) navigate(isSowon ? "/index" : "/");
   }, [admin, isSowon, navigate]);
+
+  async function requestCurrentLocation() {
+    setRequesting(true);
+    const requestedAt = new Date().toISOString();
+    await saveState((current) => ({
+      ...current,
+      locationRequests: {
+        ...(current.locationRequests || {}),
+        sowon: {
+          id: `request-${requestedAt}-${Math.random().toString(16).slice(2)}`,
+          status: "pending",
+          requestedAt,
+          requestedBy: memberId,
+          completedAt: "",
+          locationId: "",
+          message: "",
+        },
+      },
+    }));
+    setRequesting(false);
+  }
 
   return (
     <main className="app-shell">
@@ -1047,6 +1177,21 @@ function LocationView({ admin, memberId, navigate, saveState, state }) {
               새로고침
             </button>
           </div>
+          <button
+            className="primary-button"
+            type="button"
+            disabled={requesting || locationRequest?.status === "pending"}
+            onClick={requestCurrentLocation}
+          >
+            {locationRequest?.status === "pending"
+              ? "소원이 폰 확인 중"
+              : "현재 소원이 위치 찾기"}
+          </button>
+          {locationRequest ? (
+            <p className="helper-text">
+              {formatLocationRequestStatus(locationRequest)}
+            </p>
+          ) : null}
 
           {latestLocation ? (
             <>

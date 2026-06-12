@@ -1,7 +1,13 @@
 import { Pool } from "pg";
 
 const STATE_ID = "family-schedule";
-const EMPTY_STATE = { events: [], responses: [], anniversaries: [], locations: {} };
+const EMPTY_STATE = {
+  events: [],
+  responses: [],
+  anniversaries: [],
+  locations: {},
+  locationRequests: {},
+};
 
 let pool;
 let tableReady;
@@ -76,6 +82,21 @@ function normalizeMemberLocation(value) {
   return { latest, history: mergedHistory };
 }
 
+function normalizeLocationRequest(value) {
+  if (!value || typeof value !== "object") return null;
+  return {
+    id: value.id || `request-${Date.now()}`,
+    status: ["pending", "completed", "failed"].includes(value.status)
+      ? value.status
+      : "pending",
+    requestedAt: value.requestedAt || new Date().toISOString(),
+    requestedBy: value.requestedBy || "",
+    completedAt: value.completedAt || "",
+    locationId: value.locationId || "",
+    message: value.message || "",
+  };
+}
+
 function normalizeState(value) {
   const state = value && typeof value === "object" ? value : EMPTY_STATE;
   const rawLocations =
@@ -88,6 +109,17 @@ function normalizeState(value) {
       normalizeMemberLocation(location),
     ])
   );
+  const rawLocationRequests =
+    state.locationRequests &&
+    typeof state.locationRequests === "object" &&
+    !Array.isArray(state.locationRequests)
+      ? state.locationRequests
+      : {};
+  const locationRequests = Object.fromEntries(
+    Object.entries(rawLocationRequests)
+      .map(([memberId, request]) => [memberId, normalizeLocationRequest(request)])
+      .filter(([, request]) => request)
+  );
 
   return {
     events: Array.isArray(state.events) ? state.events : [],
@@ -96,6 +128,7 @@ function normalizeState(value) {
       ? state.anniversaries
       : [],
     locations,
+    locationRequests,
   };
 }
 

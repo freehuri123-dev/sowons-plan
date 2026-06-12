@@ -307,3 +307,26 @@ test("normalizeState migrates a legacy latest-only member location", () => {
   assert.equal(normalized.locations.sowon.latest.latitude, 37.5665);
   assert.equal(normalized.locations.sowon.history.length, 1);
 });
+
+test("normalizeState preserves location requests", () => {
+  const normalized = normalizeState({
+    locationRequests: {
+      sowon: {
+        id: "request-1",
+        status: "pending",
+        requestedAt: "2026-06-12T09:00:00.000Z",
+        requestedBy: "mom",
+      },
+    },
+  });
+
+  assert.deepEqual(normalized.locationRequests.sowon, {
+    id: "request-1",
+    status: "pending",
+    requestedAt: "2026-06-12T09:00:00.000Z",
+    requestedBy: "mom",
+    completedAt: "",
+    locationId: "",
+    message: "",
+  });
+});
